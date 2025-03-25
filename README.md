@@ -4,7 +4,7 @@
 
 ## 更新
 
-在下面描述的基础上做了修改，去除了SourceMapX的远程模式，使用DownloadMaps.py 下载所有maps，再使用SourceMapX.py解包
+在下面描述的基础上做了修改，去除了SourceMapX的远程模式，网址加入urls.tx每行一个，使用DownloadMaps.py 下载所有maps，再使用SourceMapX.py解包
 
 ## 安装
 
