@@ -2,6 +2,10 @@
 
 ### 批量扫描并恢复sourcemap的源代码文件。
 
+## 更新
+
+在下面描述的基础上做了修改，去除了SourceMapX的远程模式，使用DownloadMaps.py 下载所有maps，再使用SourceMapX.py解包
+
 ## 安装
 
 该脚本主要由[unwebpack-sourcemap](https://github.com/rarecoil/unwebpack-sourcemap)项目修改而来，使用Python3编写,需要安装 `BeautifulSoup4` and `requests`.可以使用 `pip3 install -r requirements.txt`命令进行安装。主要是修改为批量检测并下载，可用于SRC的漏洞挖掘。
@@ -45,5 +49,6 @@ Happy Hacking!!!
 ## 致谢
 
 [unwebpack-sourcemap](https://github.com/rarecoil/unwebpack-sourcemap) @rarecoil
+
 
 **注：请不要将该脚本用于非法用途，仅用于合法的，经过授权的渗透测试，公司内部安全检查与研究使用。由于使用工具带来的不良后果与本人无关。**
