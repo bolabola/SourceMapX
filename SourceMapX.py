@@ -31,149 +31,16 @@ class SourceMapExtractor(object):
     """Primary SourceMapExtractor class. Feed this arguments."""
 
     _target = None
-    _method = "R"
-    _attempt_sourcemap_detection = False
-    _target_extracted_sourcemaps = []
-    _is_local = False
     _path_sanitiser = None
-    _f = open("results.txt","a",encoding='utf-8')
 
-    def __init__(self, url,output,method):
+    def __init__(self, target,output):
         """Initialize the class."""
-        """
-        
-        if not output:
-            raise SourceMapExtractorError("output_directory must be set in options.")
-        else:
-            self._output_directory = os.path.abspath(options['output_directory'])
-            if not os.path.isdir(self._output_directory):
-                if options['make_directory'] is True:
-                    os.mkdir(self._output_directory)
-                else:
-                    raise SourceMapExtractorError("output_directory does not exist. Pass --make-directory to auto-make it.")
-        """
         self._output = output
-        self._method = method
         self._target = target
-        if self._method == "R":
-            self._is_local = False
-            self._attempt_sourcemap_detection = True
-        elif self._method == "L":
-            self._is_local = True 
-
-            self._path_sanitiser = PathSanitiser(output+"/"+target.replace("//","_").replace(":","_").replace("/","_"))
-
-        #self._path_sanitiser = PathSanitiser(self._output_directory)
-
-        #if options['local'] == True:
-        #    self._is_local = True
-
-        #if options['detect'] == True:
-        #    self._attempt_sourcemap_detection = True
-
-        #self._validate_target(url)
-
+        self._path_sanitiser = PathSanitiser(output)
 
     def run(self):
-        """Run extraction process."""
-        if self._is_local == False:
-            if self._attempt_sourcemap_detection:
-                detected_sourcemaps = self._detect_js_sourcemaps(self._target)
-                
-                for sourcemap in detected_sourcemaps:
-                    self._f.write(sourcemap)
-                    self._f.flush()
-                    self._parse_remote_sourcemap(sourcemap)
-            else:
-                self._parse_remote_sourcemap(self._target)
-
-        else:
-            self._parse_sourcemap(self._target)
-
-
-    def _validate_target(self, target):
-        """Do some basic validation on the target."""
-        parsed = urlparse(target)
-        if self._is_local is True:
-            
-            self._target = os.path.abspath(target)
-            if not os.path.isfile(self._target):
-                raise SourceMapExtractorError("uri_or_file is set to be a file, but doesn't seem to exist. check your path.")
-        else:
-            if parsed.scheme == "":
-                raise SourceMapExtractorError("uri_or_file isn't a URI, and --local was not set. set --local?")
-            file, ext = os.path.splitext(parsed.path)
-            self._target = target
-            if ext != '.map' and self._attempt_sourcemap_detection is False:
-                print("WARNING: URI does not have .map extension, and --detect is not flagged.")
-
-
-    def _parse_remote_sourcemap(self, uri):
-        """GET a remote sourcemap and parse it."""
-        data = self._get_remote_data(uri)
-        if data is not None:
-            self._parse_sourcemap(data, True)
-        else:
-            print("WARNING: Could not retrieve sourcemap from URI %s" % uri)
-
-
-    def _detect_js_sourcemaps(self, uri):
-        """Pull HTML and attempt to find JS files, then read the JS files and look for sourceMappingURL."""
-        remote_sourcemaps = []
-        data = self._get_remote_data(uri)
-
-        # TODO: scan to see if this is a sourcemap instead of assuming HTML
-        print("Detecting sourcemaps in HTML at %s" % uri)
-        script_strainer = SoupStrainer("script", src=True)
-        try:
-            soup = BeautifulSoup(data, "html.parser", parse_only=script_strainer)
-        except:
-            return []
-            #raise SourceMapExtractorError("Could not parse HTML at URI %s" % uri)
-
-        for script in soup:
-            source = script['src']
-            parsed_uri = urlparse(source)
-            next_target_uri = ""
-            if parsed_uri.scheme != '':
-                next_target_uri = source
-            else:
-                current_uri = urlparse(uri)
-                if source.startswith('//'):
-                    next_target_uri = current_uri.scheme + ':' + source
-                else:
-                    built_uri = current_uri.scheme + "://" + current_uri.netloc + source
-                    next_target_uri = built_uri
-
-            js_data = self._get_remote_data(next_target_uri)
-            if js_data:
-                # get last line of file
-                last_line = js_data.split("\n")[-1].strip()
-                regex = "\\/\\/#\s*sourceMappingURL=(.*)$"
-                matches = re.search(regex, last_line)
-                if matches:
-                    asset = matches.groups(0)[0].strip()
-                    asset_target = urlparse(asset)
-                    if asset_target.scheme != '':
-                        print("Detected sourcemap at remote location %s" % asset)
-                        remote_sourcemaps.append(asset)
-                    else:
-                        current_uri = urlparse(next_target_uri)
-                        asset_uri = current_uri.scheme + '://' + \
-                            current_uri.netloc + \
-                            os.path.dirname(current_uri.path) + \
-                            '/' + asset
-                        print("Detected sourcemap at remote location %s" % asset_uri)
-                        remote_sourcemaps.append(asset_uri)
-        if remote_sourcemaps:
-            temppath = self._output+"/"+uri.replace("//","_").replace(":","_").replace("/","_")
-            try:
-                os.mkdir(temppath)
-            except:
-                pass
-            self._path_sanitiser = PathSanitiser(temppath)
-        return remote_sourcemaps
-
+        self._parse_sourcemap(self._target)
 
     def _parse_sourcemap(self, target, is_str=False):
         map_data = ""
@@ -260,9 +127,6 @@ class SourceMapExtractor(object):
 class PathSanitiser(object):
     """https://stackoverflow.com/questions/13939120/sanitizing-a-file-path-in-python"""
 
-    EMPTY_NAME = "empty"
-
-    empty_idx = 0
     root_path = ""
 
     def __init__(self, root_path):
@@ -291,10 +155,6 @@ class PathSanitiser(object):
         # Ensure at least one letter or number to ignore names such as '..'
         valid_chars = "{0}{1}".format(string.ascii_letters, string.digits)
         test_filename = "".join(ch for ch in potential_file_path_name if ch in valid_chars)
-        if len(test_filename) == 0:
-            # Replace empty file name or file path part with the following
-            valid_filename = self.EMPTY_NAME + '_' + str(self.empty_idx)
-            self.empty_idx += 1
         return valid_filename
 
     def get_root_path(self):
@@ -374,28 +234,32 @@ def readfile(pfile):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="A tool to extract code from Webpack sourcemaps. Turns black boxes into gray ones.")
-    parser.add_argument("-m", "--method", default="L",help="L:Local, R:Remote")
-    parser.add_argument("-d", "--detect", action="store_true", default=False,
-        help="Attempt to detect sourcemaps from JS assets in retrieved HTML.")
-    parser.add_argument("-o","--output", default="./output/",
+    parser.add_argument("-o", "--output", default="./output/",
         help="Make the output directory if it doesn't exist.")
-    
-    parser.add_argument("uri_or_file", help="The target URI or file.")
+    parser.add_argument("sdir", help="The target directory containing .map files.")
 
     args = parser.parse_args()
     targets = []
-    #print(args["uri_or_file"])
-    if args.method=="R" and os.path.exists(args.uri_or_file):
-        
-        targets = readfile(args.uri_or_file).split("\n")
-    else:
-        target = sys.argv[1]
-        targets.append(target)
-    
+
+    # 检查目标目录是否存在
+    if not os.path.isdir(args.sdir):
+        print(f"Error: Directory '{args.sdir}' does not exist.")
+        sys.exit(1)
+
+    # 只查找根目录下的.map文件（不递归子目录）
+    for file in os.listdir(args.sdir):
+        if file.endswith(".map"):
+            map_file_path = os.path.join(args.sdir, file)
+            targets.append(map_file_path)
+
+    # 如果没有找到.map文件
+    if not targets:
+        print(f"No .map files found in directory: {args.sdir}")
+        sys.exit(0)
+
+    print(f"Found {len(targets)} .map files to process:")
+
+    # 处理每个.map文件
     for target in targets:
-        print(target)
-        if target:
-            extractor = SourceMapExtractor(target,args.output,args.method)
-            extractor.run()
-    #extractor = SourceMapExtractor(vars(args))
-    #extractor.run()
+        extractor = SourceMapExtractor(target, args.output)
+        extractor.run()
